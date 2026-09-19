@@ -149,7 +149,7 @@ def build_cmd(job, s):
            "--embed-metadata", "--continue",
            "-N", str(s["connections"]), "--retries", str(s["retries"]),
            "-o", os.path.join(folder, name + ".%(ext)s")]
-    if ARIA2 and job["mode"] == "video" and (job.get("est_bytes") or 0) >= ARIA_MIN:
+    if ARIA2 and job["mode"] == "video" and (job.get("est_bytes") or 0) >= ARIA_MIN and not job.get("no_aria"):
         # Big files: one file split over many connections (~1.8x faster on YouTube).
         # Small ones stay on yt-dlp's own downloader: YouTube throttles each plain
         # connection to about playback speed, so aria2 is slower below ~40 MB.
@@ -541,6 +541,10 @@ def run_job(job_id):
         job.update(status="done", progress=100, speed=None, eta=None, bytes=size)
     else:
         err = next((l for l in reversed(last_lines) if "ERROR" in l), last_lines[-1] if last_lines else "")
+        if "aria2c exited" in err and not job.get("no_aria"):
+            # Some servers (often YouTube) refuse aria2's split requests: retry once with yt-dlp's own downloader.
+            job.update(no_aria=True, status="queued", progress=0, speed=None, eta=None)
+            return run_job(job_id)
         job.update(status="error", error=err.replace("ERROR: ", ""))
     job["finished_at"] = time.time()
     save_history()
