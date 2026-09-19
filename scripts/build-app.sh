@@ -26,6 +26,7 @@ cp "$ROOT/mac/menubar.png" "$ROOT/mac/menubar@2x.png" "$APP/Contents/Resources/"
 
 echo "→ Backend"
 rsync -a --exclude __pycache__ "$ROOT/backend" "$APP/Contents/Resources/"
+rsync -a "$ROOT/extension" "$APP/Contents/Resources/backend/"
 
 codesign --force --deep -s - "$APP"
 

@@ -159,9 +159,14 @@ html[data-shell="mac"] .sb-hd { padding-left: 80px; min-height: 52px; }   /* cle
 .rx { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--t3); opacity: 0; transition: opacity .1s, background .1s, color .1s; }
 .ftr:hover .rx { opacity: 1; } .rx:hover { background: var(--s3); color: var(--t1); }
 .empty { display: grid; place-items: center; text-align: center; padding: 80px 20px; color: var(--t2); }
+.empty.big { min-height: 100%; padding: 20px; }
 .empty img { width: 44px; margin-bottom: 14px; opacity: .9; }
+.empty.big img { width: 96px; margin-bottom: 22px; }
 .empty h2 { font-size: 14px; font-weight: 600; color: var(--t1); margin-bottom: 4px; }
+.empty.big h2 { font-size: 22px; letter-spacing: -.4px; margin-bottom: 8px; }
 .empty p { font-size: 12px; max-width: 320px; line-height: 1.6; }
+.empty.big p { font-size: 14px; max-width: 420px; }
+.empty.big .btn-grad { margin-top: 22px; }
 
 .stbar { height: 34px; background: var(--s1); border-top: 1px solid var(--b0); display: flex; align-items: center; padding: 0 16px; gap: 14px; flex-shrink: 0; white-space: nowrap; overflow: hidden; }
 .st { display: flex; align-items: center; gap: 6px; font-size: 12px; }
@@ -426,7 +431,7 @@ body[data-view="compact"] .toast { bottom: 58px; }
       <section data-pane="general">
         <div class="set-row"><div><div>Start Peak at login</div><div class="hint">Runs quietly in the background.</div></div><button class="switch" id="loginSwitch" role="switch" aria-label="Start Peak at login"><span></span></button></div>
         <div class="set-row"><div><div>Open Peak window when a download starts</div></div><button class="switch" data-toggle="open_app_on_start" role="switch" aria-label="Open Peak window when a download starts"><span></span></button></div>
-        <div class="hint" style="padding-top:6px">The download button on videos is turned on or off from the Chrome extension popup.</div>
+        <div class="set-row"><div><div>Chrome extension</div><div class="hint">Adds the Peak button to videos and sends magnet links here. Chrome only installs extensions from outside its store in Developer mode: turn it on, click “Load unpacked”, and pick the folder Peak shows you.</div></div><button class="chip" id="installExt">Install…</button></div>
       </section>
     </div>
   </div>

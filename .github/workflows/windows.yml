@@ -1,10 +1,12 @@
 # Builds the Windows installer on GitHub's Windows machines (no Windows PC needed).
-# Push to GitHub, open Actions -> "Windows build" -> Run workflow, then download PeakSetup from the run.
+# Pushing a tag like v1.0.0 builds PeakSetup.exe and attaches it to that GitHub Release.
 name: Windows build
 on:
   workflow_dispatch:
   push:
     tags: ["v*"]
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: windows-latest
@@ -21,3 +23,8 @@ jobs:
         with:
           name: PeakSetup
           path: windows/Output/PeakSetup.exe
+      - name: Attach to the release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: windows/Output/PeakSetup.exe

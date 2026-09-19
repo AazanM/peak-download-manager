@@ -1222,6 +1222,20 @@ class Handler(BaseHTTPRequestHandler):
             job["title"] = re.sub(r"\.torrent$", "", name, flags=re.I)
             return self.send(201, job)
 
+        if path == "/api/extension/install":   # the extension ships inside the app; show it + open Chrome
+            src = next((p for p in (ROOT / "extension", ROOT.parent / "extension") if (p / "manifest.json").exists()), None)
+            if not src:
+                return self.send(404, {"error": "The extension isn't bundled with this copy of Peak"})
+            dest = DATA_DIR / "Chrome Extension"
+            shutil.rmtree(dest, ignore_errors=True)
+            shutil.copytree(src, dest)
+            reveal(str(dest / "manifest.json"))
+            if WIN:
+                subprocess.Popen(["cmd", "/c", "start", "chrome", "chrome://extensions"], creationflags=NO_WINDOW)
+            else:
+                subprocess.Popen(["open", "-a", "Google Chrome", "chrome://extensions"])
+            return self.send(200, {"ok": True, "path": str(dest)})
+
         if path == "/api/open-folder":
             d = settings()["download_dir"]
             os.makedirs(d, exist_ok=True)

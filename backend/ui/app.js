@@ -119,8 +119,9 @@ function row(j) {
   </div>`;
 }
 
-const EMPTY = `<div class="empty"><div><img src="/mark.png" alt=""><h2>Nothing downloaded yet</h2>
-  <p>Press ${IS_WIN ? 'Ctrl+V' : '⌘V'} to paste a link, drop in a magnet link, or click the Peak button on any video.</p></div></div>`;
+const EMPTY = `<div class="empty big"><div><img src="/mark.png" alt=""><h2>Nothing downloaded yet</h2>
+  <p>Press ${IS_WIN ? 'Ctrl+V' : '⌘V'} to paste a link, drop in a magnet link, or click the Peak button on any video.</p>
+  <button class="btn-grad" data-new>New download</button></div></div>`;
 
 function renderList() {
   const jobs = state.jobs.filter(matches);
@@ -393,6 +394,7 @@ async function act(id, a) {
   else await fetch(`/api/jobs/${id}/${a}`, { method: 'POST' });
 }
 $('#list').addEventListener('click', async (e) => {
+  if (e.target.closest('[data-new]')) return openAdd();
   const r = e.target.closest('[data-id]'); if (!r) return;
   const id = r.dataset.id;
   const b = e.target.closest('[data-act]');
@@ -609,6 +611,10 @@ addEventListener('resize', reportDrag);
 const EXT = qs.get('ext');
 function shell(msg) { if (SHELL) SHELL.postMessage(msg); }
 if (SHELL) document.documentElement.dataset.shell = qs.get('shell') === 'win' ? 'win' : 'mac';
+$('#installExt').onclick = async () => {
+  const r = await api('/api/extension/install', { method: 'POST' });
+  toast(r.error || 'Chrome opened. Turn on Developer mode → Load unpacked → pick the folder shown', !!r.error);
+};
 $('#loginSwitch').onclick = () => {
   if (SHELL) return shell({ type: 'login', on: $('#loginSwitch').getAttribute('aria-checked') !== 'true' });
   saveSettings({ start_at_login: state.settings.start_at_login === false });

@@ -39,7 +39,7 @@ Write-Host "-> App"
 python -m PyInstaller --noconfirm --clean --windowed `
   --name "Peak Download Manager" --icon peak.ico `
   --paths "$Root\backend" `
-  --add-data "$Root\backend\ui;ui" `
+  --add-data "$Root\backend\ui;ui" --add-data "$Root\extension;extension" `
   --hidden-import server --hidden-import ytworker --hidden-import ltworker --collect-all libtorrent `
   --collect-submodules yt_dlp `
   --collect-all webview `
