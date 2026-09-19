@@ -218,7 +218,7 @@ function fileTable(j) {
     const pct = f.size ? Math.min(100, Math.floor((f.done || 0) * 100 / f.size)) : 100;
     const parts = f.path.split('/'), nm = parts.pop();
     const st = !f.prio ? 'Skipped' : pct >= 100 ? 'Done' : `${pct}%`;
-    return `<div class="file${f.prio ? '' : ' skip'}">
+    return `<div class="file${f.prio ? '' : ' skip'}" data-frow="${i}">
       <div class="ck${f.prio ? ' on' : ''}" data-fck="${i}" title="Download this file"></div>
       <div class="nm" title="${esc(f.path)}">${esc(nm)}${parts.length > 1 ? ` <small>${esc(parts.slice(1).join('/'))}</small>` : ''}</div>
       <div class="sz num">${bytes(f.size)}</div>
@@ -295,6 +295,9 @@ function renderDetail() {
   const box = $('#detBody');
   if (box.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return;   // don't close an open menu
   box.classList.toggle('wide', !!j.files?.length);
+  const sig = `${j.id}|${j.status}|${(j.files || []).map((f) => f.prio).join(',')}`;
+  if (box.dataset.sig === sig) return patchDetail(box, j);      // same layout: just update numbers (keeps scroll, no lag)
+  box.dataset.sig = sig;
   const folder = j.file ? j.file.replace(/[\\/][^\\/]*$/, '') : j.folder || '';
   const meta = [['Source', j.mode === 'torrent' ? (j.url.startsWith('magnet:') ? 'Magnet link' : j.url.split('/').pop()) : shortUrl(j.url)],
     ['Type', typeLabel(j)], ['Saved to', tildify(folder)], ['Added', new Date(j.created_at * 1000).toLocaleString()]]
@@ -302,9 +305,20 @@ function renderDetail() {
   box.innerHTML = `<div data-id="${j.id}">
     <div class="dp-hd">${fileIcon(j, 'dp-icon')}<div style="min-width:0;flex:1"><div class="dp-filename">${esc(j.title)}</div><div class="dp-host">${esc(subtitle(j))}</div></div>
       <button class="modal-x" data-close aria-label="Close"><svg class="icon" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-    <div class="dp-body">${cardStats(j)}<div style="height:14px"></div>${fileTable(j)}<dl class="dp-meta">${meta}</dl>${cardButtons(j)}</div></div>`;
+    <div class="dp-body"><div class="dp-stats">${cardStats(j)}</div><div style="height:14px"></div>${fileTable(j)}<dl class="dp-meta">${meta}</dl>${cardButtons(j)}</div></div>`;
 }
-function openDetail(id) { state.detail = id; renderDetail(); $('#detail').classList.add('open'); }
+function patchDetail(box, j) {
+  const stats = $('.dp-stats', box);
+  if (stats) { const html = cardStats(j); if (stats.dataset.html !== html) { stats.innerHTML = html; stats.dataset.html = html; } }
+  (j.files || []).forEach((f, i) => {
+    const r = box.querySelector(`[data-frow="${i}"]`); if (!r || !f.prio) return;
+    const pct = f.size ? Math.min(100, Math.floor((f.done || 0) * 100 / f.size)) : 100;
+    const fill = r.querySelector('.fill'), lbl = r.querySelector('.pr span');
+    const txt = pct >= 100 ? 'Done' : `${pct}%`;
+    if (lbl.textContent !== txt) { lbl.textContent = txt; fill.style.width = pct + '%'; fill.classList.toggle('ok', pct >= 100); }
+  });
+}
+function openDetail(id) { $('#detBody').dataset.sig = ''; state.detail = id; renderDetail(); $('#detail').classList.add('open'); }
 onFileTable($('#detBody'), () => state.jobs.find((x) => x.id === state.detail)?.files, async (fs) => {
   const prio = fs.map((f) => f.prio);
   if (!prio.some(Boolean)) { toast('Pick at least one file', true); return refresh(); }
@@ -351,7 +365,7 @@ let taking = false;
 async function takePrompt() {
   if (taking || $('#addModal').classList.contains('open')) return;
   taking = true;
-  try { const r = await api('/api/prompt/take', { method: 'POST' }); if (r.url) { if (document.body.dataset.view === 'compact') await setView('full'); openAdd(r.url); } }
+  try { const r = await api('/api/prompt/take', { method: 'POST' }); if (r.url) { if (document.body.dataset.view === 'compact') await setView('full'); openAdd(r.url, r); } }
   finally { taking = false; }
 }
 
@@ -424,11 +438,12 @@ function fillQuality() {
   const sel = $('#aQuality'), f = add.probe;
   if (f?.file) { sel.innerHTML = '<option value="">Original file</option>'; sel.disabled = true; return renderSize(); }
   sel.disabled = false;
+  if (t === 'mp3' && add.wantQuality) state.settings = { ...state.settings, audio_quality: add.wantQuality };
   if (t === 'mp3') sel.innerHTML = ['320', '256', '192', '128'].map((q) => `<option value="${q}"${q === String(state.settings.audio_quality) ? ' selected' : ''}>${q} kbps${f?.mp3_size?.[q] ? ' · ' + bytes(f.mp3_size[q]) : ''}</option>`).join('');
   else {
     const hs = f?.video?.length ? f.video.map((v) => [String(v.height || 'best'), v.label + (v.size ? ` · ${bytes(v.size)}` : '')]) : [['best', 'Best'], ['2160', '4K'], ['1440', '1440p'], ['1080', '1080p'], ['720', '720p'], ['480', '480p']];
     sel.innerHTML = hs.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join('');
-    const want = String(state.settings.video_quality || 'best');
+    const want = add.wantQuality || String(state.settings.video_quality || 'best');
     if ([...sel.options].some((o) => o.value === want)) sel.value = want;
   }
   renderSize();
@@ -457,10 +472,11 @@ function renderFiles() {
   renderSize(); renderAddFolder();
 }
 onFileTable($('#aFiles'), () => add.meta?.files, () => renderFiles());
-function openAdd(prefill) {
+function openAdd(prefill, opts = {}) {
   add.folder = ''; add.probe = null; add.probeUrl = ''; add.meta = null;
   $('#aUrl').value = prefill || ''; $('#aBatch').value = ''; $('#aName').value = ''; $('#aConn').value = '';
-  try { const m = localStorage.getItem('peak-mode'); $('#aType').value = m === 'mp3' ? 'mp3' : 'video'; } catch {}
+  try { const m = opts.mode || localStorage.getItem('peak-mode'); $('#aType').value = m === 'mp3' ? 'mp3' : 'video'; } catch {}
+  add.wantQuality = opts.quality ? String(opts.quality) : null;     // picked on the video's Peak button
   setAddTab('url'); fillQuality(); renderFiles();
   $('#addModal').classList.add('open');
   setTimeout(() => $('#aUrl').focus(), 30);

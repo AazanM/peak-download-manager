@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Peak Download Manager",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Download MP3 or video from YouTube, Pinterest, Instagram, TikTok, X and more in one click.",
   "permissions": [
     "contextMenus",

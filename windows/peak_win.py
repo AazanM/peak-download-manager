@@ -107,6 +107,12 @@ class Api:
         if size == "full":
             w, h = load_state().get("full", FULL)
             window.resize(w, h)
+            try:                                # centred: the full app isn't the small card grown bigger
+                import ctypes
+                sw, sh = ctypes.windll.user32.GetSystemMetrics(0), ctypes.windll.user32.GetSystemMetrics(1)
+                window.move(max(0, (sw - w) // 2), max(0, (sh - h) // 2))
+            except Exception:  # noqa: BLE001
+                pass
         else:
             save_state(full=[window.width, window.height])     # remember the big window's size
             window.resize(COMPACT_W + CHROME_W, COMPACT_H + CHROME_H)
@@ -171,7 +177,7 @@ def main():
     server.hooks["show"] = lambda: show()
     httpd = server.serve()
     if link := opened_link():              # launched by a magnet click: the New download box shows it
-        server.prompts.append(link)
+        server.prompts.append({"url": link})
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
 
     tray = pystray.Icon("Peak", tray_icon(), "Peak Download Manager", pystray.Menu(

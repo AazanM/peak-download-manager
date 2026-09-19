@@ -17,9 +17,10 @@ export async function grab(url, mode, quality) {
 }
 
 // Torrents open Peak's New download box (file list, sizes, folder) instead of starting straight away.
-export async function prompt(url) {
+// Every download opens Peak's New download box first (size, folder, quality or torrent files).
+export async function prompt(url, mode, quality) {
   const r = await fetch(`${APP}/api/prompt`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url }),
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ url, mode, quality }),
   });
   if (!r.ok) throw new Error(r.statusText);
   return openApp();

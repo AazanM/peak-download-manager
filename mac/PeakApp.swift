@@ -275,7 +275,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKScriptMessageHandler
         } else {
             window.styleMask.insert(.resizable)
             window.contentMinSize = NSSize(width: 640, height: 420)
-            if let f = fullFrame ?? savedFullFrame() { window.setFrame(f, display: true, animate: true); return }
+            // The full app is its own window: open it centred, not grown out of the small card.
+            var f = fullFrame ?? savedFullFrame() ?? window.frameRect(forContentRect: NSRect(origin: .zero, size: size))
+            if let vis = (window.screen ?? NSScreen.main)?.visibleFrame {
+                f.size.width = min(f.width, vis.width); f.size.height = min(f.height, vis.height)
+                f.origin = NSPoint(x: vis.midX - f.width / 2, y: vis.midY - f.height / 2)
+            }
+            window.setFrame(f, display: true, animate: false)
+            return
         }
         let content = window.contentRect(forFrameRect: window.frame)
         var frame = window.frameRect(forContentRect: NSRect(origin: content.origin, size: size))

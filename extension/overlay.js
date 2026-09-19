@@ -154,7 +154,7 @@
     panel.querySelectorAll("[data-mode]").forEach((b) => b.addEventListener("click", async () => {
       panel.innerHTML = `<div class="msg"><div class="spin"></div>Sending to Peak…</div>`;
       const r = await send({ type: "grab", url, mode: b.dataset.mode, quality: b.dataset.q });
-      panel.innerHTML = r?.ok ? `<div class="msg">Downloading ✓</div>` : `<div class="msg err">${escapeHtml(r?.error || "Peak isn't running")}</div>`;
+      panel.innerHTML = r?.ok ? `<div class="msg">Opened in Peak ✓</div>` : `<div class="msg err">${escapeHtml(r?.error || "Peak isn't running")}</div>`;
       setTimeout(close, 1400);
     }));
   }
@@ -226,9 +226,14 @@
     if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
     const href = a.href;
     if (!/^magnet:\?/i.test(href) && !/\.torrent$/i.test(new URL(href, location.href).pathname)) return;
+    if (!chrome.runtime?.id) return;      // extension was reloaded: let the browser hand it to Peak (the magnet: app)
     e.preventDefault();
     e.stopPropagation();
-    send({ type: "torrent", url: href }).then((r) => toast(r?.ok ? "Opened in Peak ✓" : r?.error || "Peak isn't running", !r?.ok));
+    send({ type: "torrent", url: href }).then((r) => {
+      if (r?.ok) return toast("Opened in Peak ✓");
+      if (/^magnet:/i.test(href)) location.href = href;   // fall back to the system handler, which is Peak
+      else toast(r?.error || "Peak isn't running", true);
+    });
   }, true);
 
   function toast(text, err) {

@@ -1,4 +1,4 @@
-import { APP, grab, openApp, openAppIfWanted, isRunning, formats } from "./api.js";
+import { APP, prompt, openApp, isRunning, formats } from "./api.js";
 const size = (n) => !n ? "" : n >= 1e9 ? (n / 1e9).toFixed(2) + " GB" : n >= 1e8 ? Math.round(n / 1e6) + " MB" : (n / 1e6).toFixed(1) + " MB";
 
 const $ = (id) => document.getElementById(id);
@@ -53,8 +53,7 @@ function markSel() {
 async function send(mode, quality) {
   $("sub").innerHTML = `<div class="msg"><div class="spin"></div>Sending to Peak…</div>`;
   try {
-    await grab(tab.url, mode, quality);
-    await openAppIfWanted();
+    await prompt(tab.url, mode, quality);
     window.close();
   } catch (e) {
     $("sub").innerHTML = `<div class="msg">${esc(e.message)}</div>`;

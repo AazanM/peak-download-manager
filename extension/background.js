@@ -1,4 +1,4 @@
-import { grab, prompt, openApp, openAppIfWanted, isRunning, formats, SIZES } from "./api.js";
+import { prompt, openApp, isRunning, formats, SIZES } from "./api.js";
 
 chrome.runtime.onInstalled.addListener(() => {
   const ctx = ["page", "link", "video", "audio"];
@@ -14,9 +14,7 @@ async function send(url, mode, quality) {
     return { ok: false, error: "Peak isn't running" };
   }
   try {
-    if (mode === "torrent") { await prompt(url); return { ok: true }; }
-    await grab(url, mode, quality);
-    await openAppIfWanted();
+    await prompt(url, mode, quality);
     return { ok: true };
   } catch (e) {
     notify("Couldn't start download", e.message);

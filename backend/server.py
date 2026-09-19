@@ -1190,12 +1190,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200 if "error" not in res else 400, {**res, "src": src})
 
         if path == "/api/prompt":         # magnet clicked in the browser / Finder: ask before downloading
-            prompts.append(b.get("url") or "")
+            prompts.append({k: b.get(k) for k in ("url", "mode", "quality")})
             if hooks["show"]:
                 hooks["show"]()
             return self.send(200, {"ok": True})
         if path == "/api/prompt/take":
-            return self.send(200, {"url": prompts.pop(0) if prompts else None})
+            return self.send(200, prompts.pop(0) if prompts else {"url": None})
 
         if m := re.fullmatch(r"/api/jobs/(\w+)/prio", path):   # per-file torrent priorities
             job = jobs.get(m.group(1))
