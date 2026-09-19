@@ -1,0 +1,23 @@
+# Builds the Windows installer on GitHub's Windows machines (no Windows PC needed).
+# Push to GitHub, open Actions -> "Windows build" -> Run workflow, then download PeakSetup from the run.
+name: Windows build
+on:
+  workflow_dispatch:
+  push:
+    tags: ["v*"]
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: Build
+        run: powershell -ExecutionPolicy Bypass -File windows\build.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PeakSetup
+          path: windows/Output/PeakSetup.exe

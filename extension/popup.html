@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #000000; --s2: #121212; --s3: #1A1A1A; --s4: #242424;
+    --b1: rgba(255,255,255,.08); --b2: rgba(255,255,255,.18);
+    --grad: linear-gradient(140deg, #00C4FF 0%, #3660FF 55%, #1111C8 100%);
+    --text: #FFFFFF; --muted: #A0A0A0; --ok: #34D399; --err: #F87171;
+  }
+  * { box-sizing: border-box; }
+  body { width: 320px; margin: 0; padding: 12px; font: 400 13px/1.35 'Inter', system-ui, sans-serif; color: var(--text); background: var(--bg); -webkit-font-smoothing: antialiased; }
+  .num { font-variant-numeric: tabular-nums; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .tile { all: unset; box-sizing: border-box; position: relative; border-radius: 12px; border: 1px solid var(--b1); background: var(--s2); padding: 11px; min-height: 84px; display: flex; flex-direction: column; justify-content: space-between; transition: border-color .12s, background .12s, transform .1s; }
+  button.tile { cursor: pointer; }
+  button.tile:hover { border-color: var(--b2); background: var(--s3); }
+  button.tile:active { transform: scale(.97); }
+  button.tile:disabled { opacity: .35; cursor: default; transform: none; }
+  .span3 { grid-column: span 3; min-height: 0; }
+  .tile .k { font-size: 10.5px; color: var(--muted); }
+  .tile .v { font-size: 14.5px; font-weight: 600; letter-spacing: -.02em; }
+  .tile .ic { width: 28px; height: 28px; border-radius: 8px; background: var(--s4); display: grid; place-items: center; }
+  .hero { background: var(--grad); border-color: transparent; box-shadow: 0 6px 18px -6px rgba(54,96,255,.6); color: #fff; }
+  .hero .k { color: rgba(255,255,255,.75); } .hero .ic { background: rgba(255,255,255,.18); }
+  button.hero:hover { background: var(--grad); filter: brightness(1.08); border-color: transparent; }
+  .wire { position: absolute; left: 50%; bottom: -9px; width: 1px; height: 9px; background: var(--b2); }
+  .page { background: #0A0A0A; }
+  .page .t { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 8px; }
+  .head { display: flex; align-items: center; justify-content: space-between; }
+  .brand { display: flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; }
+  .brand img { width: 18px; height: 21px; object-fit: contain; filter: drop-shadow(0 2px 6px rgba(54,96,255,.4)); }
+  .status { display: flex; align-items: center; gap: 5px; font-size: 10.5px; color: var(--muted); }
+  .status i { width: 6px; height: 6px; border-radius: 50%; background: #00C4FF; box-shadow: 0 0 8px rgba(0,196,255,.6); }
+  .status.off { color: var(--err); } .status.off i { background: var(--err); box-shadow: none; }
+  .sub { margin-top: 8px; display: none; }
+  .sub.open { display: grid; animation: grow .16s cubic-bezier(.2,.9,.3,1.1); }
+  @keyframes grow { from { opacity: 0; transform: translateY(-5px) scale(.98); } }
+  .sub .tile { min-height: 54px; align-items: center; justify-content: center; gap: 1px; padding: 8px; }
+  .sub .tile .v { font-size: 14px; }
+  .sub .ghost { background: linear-gradient(90deg, #161616 0%, #222 50%, #161616 100%); background-size: 200% 100%; animation: shimmer 1s linear infinite; }
+  @keyframes shimmer { to { background-position: -200% 0; } }
+  .sub-label { grid-column: span 3; display: flex; justify-content: space-between; font-size: 10.5px; color: var(--muted); padding: 2px 2px 0; }
+  .row { margin-top: 8px; }
+  .switch { all: unset; cursor: pointer; width: 34px; height: 20px; border-radius: 99px; background: var(--s4); display: flex; align-items: center; padding: 0 2px; box-sizing: border-box; transition: background .2s; }
+  .switch span { width: 16px; height: 16px; border-radius: 50%; background: var(--muted); transition: transform .2s, background .2s; }
+  .switch[aria-checked="true"] { background: #3660FF; }
+  .switch[aria-checked="true"] span { transform: translateX(14px); background: #fff; }
+  .opt { flex-direction: row; align-items: center; justify-content: space-between; min-height: 0; padding: 10px 12px; font-size: 12px; }
+  .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--b2); border-top-color: #00C4FF; animation: spin .8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .msg { grid-column: span 3; display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; color: var(--muted); font-size: 12px; text-align: center; padding: 8px; }
+  .note { font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 4px; white-space: normal; }
+</style>
+</head>
+<body>
+  <div class="grid" id="main">
+    <!-- page tile -->
+    <div class="tile span3 page">
+      <div class="head">
+        <div class="brand"><img src="icons/mark.png" alt="">Peak</div>
+        <div class="status" id="status"><i></i><span>ready</span></div>
+      </div>
+      <div class="t" id="pageTitle"></div>
+      <div class="k" id="pageHost"></div>
+      <div class="note" id="note" hidden></div>
+      <div class="wire"></div>
+    </div>
+
+    <!-- actions -->
+    <button class="tile hero" id="mp3">
+      <div class="ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V6l10-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="16.5" cy="16" r="2.5"/></svg></div>
+      <div><div class="v">MP3</div><div class="k num" id="mp3Sub">audio</div></div>
+    </button>
+    <button class="tile" id="video">
+      <div class="ic"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="6" width="13" height="12" rx="3"/><path d="M16 11l5-3v8l-5-3z"/></svg></div>
+      <div><div class="v">Video</div><div class="k num" id="videoSub">checking…</div></div>
+    </button>
+    <button class="tile" data-open>
+      <div class="ic"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M7 17 17 7"/><path d="M9 7h8v8"/></svg></div>
+      <div><div class="v">Open</div><div class="k">Peak app</div></div>
+    </button>
+  </div>
+
+  <!-- quality bento that opens when you click MP3 / Video -->
+  <div class="grid sub" id="sub"></div>
+
+  <div class="grid row">
+    <div class="tile span3 opt">Show button on videos
+      <button class="switch" id="overlaySwitch" role="switch" aria-checked="true" aria-label="Show download button on videos"><span></span></button>
+    </div>
+  </div>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

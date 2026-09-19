@@ -1,0 +1,14 @@
+.DS_Store
+__pycache__/
+*.pyc
+build/
+windows/dist/
+windows/build/
+windows/Output/
+windows/*.spec
+backend/bin/
+# internal design notes
+SPEC.md
+design/REDESIGN_BRIEF.md
+design/spec.html
+design/fetch-ui/

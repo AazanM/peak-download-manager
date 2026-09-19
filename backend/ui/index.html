@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Peak Download Manager</title>
+<link rel="icon" href="/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+  --bg: #000000; --s1: #0B0B0B; --s2: #151515; --s3: #1E1E1E; --s4: #2A2A2A;
+  --b0: rgba(255,255,255,.06); --b1: rgba(255,255,255,.10); --b2: rgba(255,255,255,.22);
+  --c1: #00C4FF; --c2: #3660FF; --c3: #1111C8;
+  --grad: linear-gradient(140deg, #00C4FF 0%, #3660FF 55%, #1111C8 100%);
+  --t1: #FFFFFF; --t2: #A7A7A7; --t3: #6A6A6A;
+  --ok: #34D399; --warn: #FBBF24; --err: #F87171;
+}
+html, body { height: 100%; }
+body { font: 400 13px/1.5 'Inter', -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--t1); -webkit-font-smoothing: antialiased; overflow: hidden; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+.num { font-variant-numeric: tabular-nums; }
+.gtext { background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+@keyframes blink { 0%,100% { opacity: 1 } 50% { opacity: .28 } }
+@keyframes spin { to { transform: rotate(360deg) } }
+@keyframes sweep { from { transform: translateX(-100%) } to { transform: translateX(250%) } }
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px) } }
+.mark { width: 22px; height: 26px; object-fit: contain; flex-shrink: 0; filter: drop-shadow(0 2px 8px rgba(54,96,255,.35)); }
+.icon { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--b2); border-top-color: var(--c1); animation: spin .8s linear infinite; }
+
+/* two views: compact widget / full app */
+body[data-view="compact"] .app { display: none; }
+body[data-view="full"] .w { display: none; }
+
+/* ══════ COMPACT CARD ══════ */
+/* The small window: one card for the current download (same card as the details panel). */
+.w { height: 100vh; display: flex; flex-direction: column; background: var(--s1); overflow: hidden; }
+html[data-shell="mac"] body[data-view="compact"] .w { background: rgba(11,11,11,.92); }
+html[data-shell="mac"] body[data-view="compact"], html[data-surface="popover"] body { background: transparent; }
+.w .dp-hd { padding: 14px 14px 12px 16px; }
+.w .dp-body { flex: 1; display: flex; flex-direction: column; padding: 12px 16px 14px; }
+.w .dp-grid { gap: 8px; margin-bottom: 10px; }
+.w .dp-actions { margin-top: auto; }
+.w-more { font-size: 10.5px; font-weight: 600; padding: 2px 8px; border-radius: 20px; background: var(--s3); color: var(--t2); white-space: nowrap; }
+.w-more:hover { color: var(--t1); }
+.w-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 22px; gap: 4px; }
+.w-empty img { width: 34px; margin-bottom: 8px; }
+.w-empty b { font-size: 13.5px; font-weight: 600; }
+.w-empty span { font-size: 11.5px; color: var(--t2); line-height: 1.5; }
+.w-paste { display: flex; gap: 6px; width: 100%; margin-top: 14px; }
+.w-paste input { flex: 1; min-width: 0; background: var(--s2); border: 1px solid var(--b1); border-radius: 9px; padding: 8px 11px; font-size: 12px; outline: none; }
+.w-paste input:focus { border-color: var(--c2); }
+.w-last { width: 100%; margin-top: 12px; display: flex; align-items: center; gap: 9px; background: var(--s2); border-radius: 10px; padding: 8px 10px; text-align: left; }
+.w-last .fi { width: 28px; height: 28px; font-size: 13px; }
+.w-last div { min-width: 0; flex: 1; }
+.w-last .fn { font-size: 12px; } .w-last .fu { font-size: 10.5px; }
+.trk { height: 3px; background: rgba(255,255,255,.1); border-radius: 2px; overflow: hidden; position: relative; }
+.fill { height: 100%; border-radius: 2px; background: var(--grad); transition: width .4s ease; }
+.fill.ok { background: var(--ok); } .fill.pz { background: var(--t3); }
+.trk.sweep .fill { width: 40% !important; animation: sweep 1.1s ease-in-out infinite; }
+
+/* shared small controls */
+.seg { display: inline-flex; background: var(--s2); border: 1px solid var(--b1); border-radius: 8px; padding: 2px; gap: 2px; flex-shrink: 0; }
+.seg button { font-size: 11.5px; font-weight: 500; color: var(--t2); padding: 4px 10px; border-radius: 6px; transition: background .12s, color .12s; }
+.seg button[aria-pressed="true"] { background: var(--s4); color: var(--t1); }
+.seg.sm button { padding: 3px 8px; font-size: 11px; }
+.btn-grad { display: inline-flex; align-items: center; gap: 7px; background: var(--grad); color: #fff; font-size: 13px; font-weight: 600; padding: 7px 14px; border-radius: 8px; white-space: nowrap; box-shadow: 0 4px 16px rgba(54,96,255,.28); flex-shrink: 0; transition: filter .12s, transform .1s; }
+.btn-grad:hover { filter: brightness(1.1); } .btn-grad:active { transform: scale(.97); }
+.btn-grad .icon { stroke: #fff; stroke-width: 2.6; }
+.btn-grad.sm { font-size: 11.5px; padding: 6px 11px; }
+.btn-ghost { font-size: 12px; font-weight: 500; padding: 7px 14px; border-radius: 8px; background: var(--s2); border: 1px solid var(--b1); color: var(--t1); transition: background .12s; }
+.btn-ghost:hover { background: var(--s3); }
+
+/* ══════ EXPANDED APP ══════ */
+.app { display: flex; height: 100vh; background: var(--s1); }
+.sb { width: 198px; flex-shrink: 0; background: var(--s1); border-right: 1px solid var(--b0); display: flex; flex-direction: column; overflow: hidden; }
+.sb-hd { padding: 13px 13px 11px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid var(--b0); }
+.sb-appname { font-size: 13.5px; font-weight: 700; letter-spacing: -.4px; flex: 1; white-space: nowrap; }
+.sb-grp { padding: 11px 8px 4px; }
+.sb-grp-lbl { font-size: 10px; font-weight: 500; color: var(--t3); padding: 0 6px; margin-bottom: 3px; letter-spacing: .04em; }
+.si { width: 100%; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; color: var(--t2); font-size: 12.5px; user-select: none; transition: background .12s, color .12s; text-align: left; }
+.si:hover { background: var(--s2); color: var(--t1); }
+.si[aria-pressed="true"] { background: rgba(54,96,255,.12); color: var(--t1); }
+.si svg { width: 14px; height: 14px; flex-shrink: 0; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.si[aria-pressed="true"] svg { stroke: var(--c2); }
+.si-n { margin-left: auto; font-size: 10px; font-weight: 500; background: var(--s3); color: var(--t2); padding: 1px 6px; border-radius: 20px; flex-shrink: 0; min-width: 18px; text-align: center; }
+.si[aria-pressed="true"] .si-n { background: rgba(54,96,255,.2); color: var(--c2); }
+.si-n:empty { display: none; }
+.sb-div { height: 1px; background: var(--b0); margin: 5px 8px; }
+.tpip { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; margin: 0 3.5px; }
+.sb-flex { flex: 1; }
+.dskw { margin: 8px; background: var(--s2); border: 1px solid var(--b1); border-radius: 11px; padding: 10px 12px; text-align: left; transition: border-color .12s; }
+.dskw:hover { border-color: var(--b2); }
+.dskw-r { display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; }
+.dskw-l { font-size: 11px; font-weight: 500; color: var(--t2); }
+.dskw-p { font-size: 12px; font-weight: 700; }
+.dsk-trk { height: 3px; background: var(--s4); border-radius: 3px; overflow: hidden; }
+.dsk-fill { height: 100%; border-radius: 3px; background: var(--grad); }
+.dskw.hi .dsk-fill { background: linear-gradient(90deg, var(--c2), var(--err)); } .dskw.hi .dskw-p { color: var(--err); }
+.dsk-path { font-size: 10px; color: var(--t2); margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.mn { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); min-width: 0; }
+.tb2 { height: 52px; background: var(--s1); border-bottom: 1px solid var(--b0); display: flex; align-items: center; gap: 3px; padding: 0 14px; overflow: hidden; flex-shrink: 0; }
+.tsep { width: 1px; height: 20px; background: var(--b1); margin: 0 5px; flex-shrink: 0; }
+.tspc { flex: 1; }
+.bg { display: flex; align-items: center; gap: 5px; color: var(--t2); font-size: 12px; padding: 6px 10px; border-radius: 7px; transition: all .12s; white-space: nowrap; flex-shrink: 0; }
+.bg:hover:not(:disabled) { background: var(--s2); color: var(--t1); }
+.bg:disabled { opacity: .35; cursor: default; }
+.sbx { display: flex; align-items: center; gap: 7px; background: var(--s2); border: 1px solid var(--b1); border-radius: 8px; padding: 0 11px; color: var(--t2); font-size: 12px; flex-shrink: 1; min-width: 120px; width: 190px; height: 30px; }
+.sbx:focus-within { border-color: var(--b2); }
+.sbx input { background: none; border: 0; outline: none; font-size: 12px; width: 100%; color: var(--t1); }
+.sbx input::placeholder { color: var(--t2); }
+
+.fl { flex: 1; overflow-y: auto; }
+.fl::-webkit-scrollbar { width: 4px; } .fl::-webkit-scrollbar-thumb { background: var(--s4); border-radius: 4px; }
+.ftr { display: grid; grid-template-columns: 22px minmax(0,1fr) minmax(120px,200px) 28px; padding: 0 12px 0 16px; align-items: center; column-gap: 12px; }
+.pc-pct { font-size: 11px; color: var(--t2); text-align: right; margin-bottom: 5px; }
+.pc-done { font-size: 11.5px; color: var(--t2); text-align: right; }
+.fu .sp { color: var(--t1); font-weight: 500; }
+.bulk { display: none; align-items: center; gap: 2px; margin-left: 8px; }
+.bulk.on { display: flex; }
+.bulk-n { font-size: 11.5px; color: var(--t2); margin-right: 4px; }
+.icon-btn.lg { width: 30px; height: 30px; border-radius: 8px; }
+.icon-btn.lg .icon { width: 15px; height: 15px; }
+html[data-shell="mac"] .sb-hd { padding-left: 80px; min-height: 52px; }   /* clear of the traffic lights */
+.fth { height: 34px; background: var(--s1); border-bottom: 1px solid var(--b0); position: sticky; top: 0; z-index: 5; }
+.th { font-size: 11px; font-weight: 500; color: var(--t3); }
+.ftr { min-height: 58px; border-bottom: 1px solid var(--b0); transition: background .1s; border-left: 2px solid transparent; padding-left: 14px; }
+.ftr:hover { background: var(--s1); }
+.ftr.on { background: rgba(54,96,255,.06); border-left-color: var(--c2); }
+.ck { width: 14px; height: 14px; border: 1px solid var(--b2); border-radius: 4px; flex-shrink: 0; display: grid; place-items: center; }
+.ck.on { background: var(--c2); border-color: var(--c2); }
+.ck.on::after { content: ''; width: 8px; height: 6px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 8 6'%3E%3Cpath d='M1 3l2 2 4-4' stroke='white' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat; }
+.fc { display: flex; align-items: center; gap: 10px; min-width: 0; cursor: pointer; }
+.fi { width: 32px; height: 32px; border-radius: 8px; background: var(--s3) center/cover no-repeat; display: grid; place-items: center; font-size: 15px; flex-shrink: 0; line-height: 1; position: relative; overflow: hidden; }
+.fi .tag { position: absolute; right: 1px; bottom: 1px; font-size: 7px; font-weight: 700; background: rgba(5,5,14,.8); color: var(--t1); padding: 0 3px; border-radius: 3px; line-height: 11px; }
+.ft { min-width: 0; }
+.fn { font-size: 12.5px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fu { font-size: 10px; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.fu.err { color: var(--err); }
+.csz { font-size: 12px; color: var(--t2); }
+.csp { font-size: 12px; font-weight: 500; } .csp.lo, .csp.off { color: var(--t2); }
+.pc-r { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; gap: 6px; }
+.pc-l { font-size: 10.5px; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pc .trk { height: 3px; background: var(--s3); }
+.eta { font-size: 11.5px; color: var(--t2); }
+.bdg { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 500; padding: 3px 9px; border-radius: 20px; white-space: nowrap; }
+.bdg.dl { background: rgba(54,96,255,.12); color: #6b8cff; }
+.bdg.ok { background: rgba(52,211,153,.12); color: var(--ok); }
+.bdg.pz { background: rgba(80,80,140,.14); color: var(--t2); }
+.bdg.q { background: rgba(251,191,36,.10); color: var(--warn); }
+.bdg.er { background: rgba(248,113,113,.12); color: var(--err); }
+.bdot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
+.bdot.p { animation: blink 1.5s ease-in-out infinite; }
+.rx { width: 24px; height: 24px; border-radius: 6px; display: grid; place-items: center; color: var(--t3); opacity: 0; transition: opacity .1s, background .1s, color .1s; }
+.ftr:hover .rx { opacity: 1; } .rx:hover { background: var(--s3); color: var(--t1); }
+.empty { display: grid; place-items: center; text-align: center; padding: 80px 20px; color: var(--t2); }
+.empty img { width: 44px; margin-bottom: 14px; opacity: .9; }
+.empty h2 { font-size: 14px; font-weight: 600; color: var(--t1); margin-bottom: 4px; }
+.empty p { font-size: 12px; max-width: 320px; line-height: 1.6; }
+
+.stbar { height: 34px; background: var(--s1); border-top: 1px solid var(--b0); display: flex; align-items: center; padding: 0 16px; gap: 14px; flex-shrink: 0; white-space: nowrap; overflow: hidden; }
+.st { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+.st .icon { width: 12px; height: 12px; stroke: var(--t2); stroke-width: 2.2; }
+.stv { font-weight: 600; } .stk { color: var(--t2); }
+.stsep { width: 1px; height: 14px; background: var(--b1); flex-shrink: 0; }
+.offline { display: none; background: rgba(248,113,113,.1); color: var(--err); font-size: 12px; padding: 8px 16px; border-bottom: 1px solid rgba(248,113,113,.2); }
+.offline.show { display: block; }
+
+/* ══════ MODALS (new download, details, settings) ══════ */
+.scrim { position: fixed; inset: 0; background: rgba(2,2,8,.6); backdrop-filter: blur(3px); display: none; place-items: center; z-index: 50; padding: 16px; }
+.scrim.open { display: grid; animation: fade-in .14s ease; }
+.modal { background: var(--s1); border: 1px solid var(--b2); border-radius: 16px; overflow: hidden; width: 520px; max-width: 100%; max-height: calc(100vh - 32px); display: flex; flex-direction: column; box-shadow: 0 32px 80px rgba(0,0,0,.6); }
+.modal-hd, .modal-head { padding: 16px 20px 13px; border-bottom: 1px solid var(--b0); display: flex; align-items: center; justify-content: space-between; font-size: 15px; font-weight: 600; letter-spacing: -.3px; }
+.modal-x, .icon-btn { width: 26px; height: 26px; border-radius: 7px; display: grid; place-items: center; color: var(--t2); }
+.modal-x:hover, .icon-btn:hover { background: var(--s3); color: var(--t1); }
+.icon-btn svg { stroke: currentColor; }
+.modal-tabs, .tabs { display: flex; border-bottom: 1px solid var(--b0); overflow-x: auto; flex-shrink: 0; }
+.mtab, .tabs button { padding: 10px 18px; font-size: 12.5px; color: var(--t2); white-space: nowrap; }
+.mtab[aria-selected="true"], .tabs button[aria-selected="true"] { font-weight: 600; color: #6b8cff; box-shadow: inset 0 -2px 0 var(--c2); }
+.mtab:disabled { opacity: .4; cursor: default; }
+.modal-body { padding: 18px 20px; overflow-y: auto; }
+.m-url { width: 100%; background: var(--s2); border: 1px solid var(--b2); border-radius: 9px; padding: 11px 13px; font-size: 13px; outline: none; margin-bottom: 14px; resize: none; }
+.m-url:focus { border-color: var(--c2); box-shadow: 0 0 0 3px rgba(54,96,255,.12); }
+.m-url::placeholder { color: var(--t2); }
+textarea.m-url { height: 120px; line-height: 1.5; font-size: 12px; }
+.m-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.m-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+.m-lbl { font-size: 11px; color: var(--t2); margin-bottom: 5px; }
+.m-val { width: 100%; background: var(--s2); border: 1px solid var(--b1); border-radius: 7px; padding: 7px 10px; font-size: 12px; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; outline: none; text-align: left; }
+.m-val:focus { border-color: var(--b2); }
+.m-val::placeholder { color: var(--t3); }
+.m-val span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+select.m-val { color: var(--t1); appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%236A6A9E' stroke-width='2' stroke-linecap='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; background-size: 11px; padding-right: 26px; }
+select.m-val option { background: var(--s2); }
+.m-probe { font-size: 11px; color: var(--t2); margin: -6px 0 14px; min-height: 16px; display: flex; gap: 6px; align-items: center; }
+.modal-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.m-adv { font-size: 12px; color: #6b8cff; }
+.modal-btns { display: flex; gap: 8px; margin-left: auto; }
+
+/* detail panel */
+.det { width: 380px; }
+.dp-hd { padding: 16px 18px 12px; border-bottom: 1px solid var(--b0); display: flex; align-items: center; gap: 10px; }
+.dp-icon { width: 38px; height: 38px; border-radius: 9px; background: var(--s3) center/cover; display: grid; place-items: center; font-size: 16px; flex-shrink: 0; }
+.dp-filename { font-size: 13px; font-weight: 600; letter-spacing: -.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dp-host { font-size: 10.5px; color: var(--t2); }
+.dp-body { padding: 14px 18px 16px; }
+.dp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.dp-stat { background: var(--s2); border-radius: 9px; padding: 10px 12px; }
+.dp-sv { font-size: 16px; font-weight: 700; letter-spacing: -.6px; line-height: 1.1; margin-bottom: 2px; }
+.dp-sk { font-size: 10px; color: var(--t2); }
+.dp-threads { display: flex; gap: 2px; margin-bottom: 8px; }
+.dp-thread { height: 10px; flex: 1; border-radius: 2px; background: var(--grad); opacity: .75; transition: opacity .3s; }
+.dp-thread.idle { background: var(--s4); opacity: 1; }
+.dp-thread-lbl { font-size: 10px; color: var(--t2); margin-bottom: 14px; }
+.dp-prog-lbl { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 11px; color: var(--t2); }
+.dp-body > .trk { height: 4px; margin-bottom: 14px; }
+.dp-err { font-size: 11.5px; color: var(--err); background: rgba(248,113,113,.08); border-radius: 8px; padding: 8px 10px; margin-bottom: 14px; line-height: 1.5; }
+.dp-actions { display: flex; gap: 6px; }
+.dp-actions .btn-grad { flex: 1; justify-content: center; }
+
+.det.wide { width: 680px; }
+.det > div { display: flex; flex-direction: column; min-height: 0; max-height: 100%; }
+.det .dp-body { overflow-y: auto; }
+.m-grid2:has(> [hidden]) { grid-template-columns: 1fr; }
+.dp-meta { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 11.5px; margin-bottom: 14px; }
+.dp-meta dt { color: var(--t2); } .dp-meta dd { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.files { border: 1px solid var(--b1); border-radius: 10px; overflow: hidden; margin-bottom: 14px; }
+.files-hd, .file { display: grid; grid-template-columns: 22px minmax(0,1fr) 70px 110px 92px; gap: 10px; align-items: center; padding: 0 10px; }
+.files-hd { height: 30px; background: var(--s2); font-size: 10.5px; color: var(--t3); font-weight: 500; }
+.files-bd { max-height: 240px; overflow-y: auto; }
+.file { min-height: 34px; border-top: 1px solid var(--b0); font-size: 11.5px; }
+.file.skip { color: var(--t3); }
+.file .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file .nm small { color: var(--t3); }
+.file .sz { color: var(--t2); text-align: right; }
+.file .pr { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--t2); }
+.file .pr .trk { flex: 1; }
+.file select { background: var(--s2); border: 1px solid var(--b1); border-radius: 6px; font-size: 11px; padding: 3px 4px; color: var(--t1); outline: none; }
+.file.skip select { color: var(--t3); }
+.files-ft { display: flex; justify-content: space-between; padding: 7px 10px; font-size: 11px; color: var(--t2); background: var(--s2); border-top: 1px solid var(--b0); }
+.files-ft button { color: #6b8cff; font-size: 11px; }
+#addModal .modal.wide { width: 680px; }
+.m-size { display: flex; gap: 14px; font-size: 11.5px; color: var(--t2); margin: -4px 0 14px; }
+.m-size b { color: var(--t1); font-weight: 600; }
+
+/* settings (reuses the modal) */
+#settings .modal { width: 540px; }
+.modal-body section { display: none; } .modal-body section.on { display: block; }
+.set-block { padding: 10px 0; border-bottom: 1px solid var(--b0); }
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 0; border-bottom: 1px solid var(--b0); font-size: 12.5px; }
+.lbl { font-size: 12.5px; margin-bottom: 7px; }
+.hint { font-size: 11px; color: var(--t2); margin-top: 2px; line-height: 1.45; }
+.path { display: flex; align-items: center; gap: 6px; }
+.path > div { flex: 1; min-width: 0; font-size: 12px; background: var(--s2); border: 1px solid var(--b1); border-radius: 7px; padding: 6px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: left; }
+.chip { font-size: 11.5px; font-weight: 500; padding: 6px 11px; border-radius: 7px; background: var(--s3); border: 1px solid var(--b1); white-space: nowrap; }
+.chip:hover { background: var(--s4); }
+.chip.ghost { background: none; color: var(--t2); }
+.set-block .seg { flex-wrap: wrap; }
+.switch { width: 34px; height: 20px; border-radius: 99px; background: var(--s4); display: flex; align-items: center; padding: 0 2px; flex-shrink: 0; transition: background .2s; }
+.switch span { width: 16px; height: 16px; border-radius: 50%; background: var(--t2); transition: transform .2s, background .2s; }
+.switch[aria-checked="true"] { background: var(--c2); }
+.switch[aria-checked="true"] span { transform: translateX(14px); background: #fff; }
+.num-in { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--t2); }
+.num-in input { width: 64px; background: var(--s2); border: 1px solid var(--b1); border-radius: 7px; padding: 5px 8px; font-size: 12px; text-align: right; outline: none; }
+.text-in { width: 100%; background: var(--s2); border: 1px solid var(--b1); border-radius: 7px; padding: 7px 10px; font-size: 12px; outline: none; }
+.text-in::placeholder { color: var(--t3); }
+
+.toast { position: fixed; left: 50%; bottom: 46px; transform: translate(-50%, 12px); background: var(--s3); border: 1px solid var(--b2); color: var(--t1); font-size: 12px; font-weight: 500; padding: 8px 14px; border-radius: 9px; opacity: 0; pointer-events: none; transition: opacity .18s, transform .18s; z-index: 80; box-shadow: 0 10px 30px rgba(0,0,0,.5); white-space: nowrap; max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.err { color: var(--err); border-color: rgba(248,113,113,.3); }
+body[data-view="compact"] .toast { bottom: 58px; }
+
+/* narrower full window: drop the less important columns */
+@media (max-width: 900px) { .bg .lbl-t { display: none; } }
+@media (max-width: 700px) {
+  .sb { display: none; }
+  .ftr { grid-template-columns: 22px minmax(0,1fr) minmax(80px,120px) 28px; }
+}
+[hidden] { display: none !important; }
+</style>
+</head>
+<body data-view="compact">
+
+<!-- ══════ COMPACT CARD ══════ -->
+<div class="w" id="widget"></div>
+
+<!-- ══════ EXPANDED APP ══════ -->
+<div class="app">
+  <aside class="sb">
+    <div class="sb-hd" data-drag>
+      <img class="mark" src="/mark.png" alt="">
+      <span class="sb-appname">Peak</span>
+      <button class="icon-btn" id="collapse" title="Compact widget" aria-label="Compact widget"><svg class="icon" viewBox="0 0 24 24"><path d="M4 14h6v6M10 14l-7 7M20 10h-6V4M14 10l7-7"/></svg></button>
+    </div>
+    <div class="sb-grp">
+      <div class="sb-grp-lbl">Library</div>
+      <button class="si" data-filter="all"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>All downloads<span class="si-n num" data-count="all"></span></button>
+      <button class="si" data-filter="active"><svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Active<span class="si-n num" data-count="active"></span></button>
+      <button class="si" data-filter="done"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="9 12 11 14 15 10"/></svg>Complete<span class="si-n num" data-count="done"></span></button>
+      <button class="si" data-filter="paused"><svg viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>Paused<span class="si-n num" data-count="paused"></span></button>
+      <button class="si" data-filter="failed"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>Failed<span class="si-n num" data-count="failed"></span></button>
+    </div>
+    <div class="sb-div"></div>
+    <div class="sb-grp">
+      <div class="sb-grp-lbl">Types</div>
+      <button class="si" data-filter="t-video"><div class="tpip" style="background:#8B5CF6"></div>Videos<span class="si-n num" data-tcount="t-video"></span></button>
+      <button class="si" data-filter="t-music"><div class="tpip" style="background:#3B82F6"></div>Music<span class="si-n num" data-tcount="t-music"></span></button>
+      <button class="si" data-filter="t-docs"><div class="tpip" style="background:#10B981"></div>Documents<span class="si-n num" data-tcount="t-docs"></span></button>
+      <button class="si" data-filter="t-apps"><div class="tpip" style="background:#F59E0B"></div>Apps &amp; archives<span class="si-n num" data-tcount="t-apps"></span></button>
+      <button class="si" data-filter="t-torrent"><div class="tpip" style="background:#EC4899"></div>Torrents<span class="si-n num" data-tcount="t-torrent"></span></button>
+    </div>
+    <div class="sb-flex"></div>
+    <button class="dskw" id="disk" title="Open download folder">
+      <div class="dskw-r"><span class="dskw-l">Disk space</span><span class="dskw-p num" id="diskPct">—</span></div>
+      <div class="dsk-trk"><div class="dsk-fill" id="diskFill" style="width:0"></div></div>
+      <div class="dsk-path num" id="diskPath"></div>
+    </button>
+  </aside>
+
+  <div class="mn">
+    <div class="tb2" data-drag>
+      <button class="btn-grad" id="addBtn"><svg class="icon" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>New download</button>
+      <div class="bulk" id="bulk">
+        <span class="bulk-n num" id="bulkN"></span>
+        <button class="bg" data-bulk="resume" disabled><svg class="icon" viewBox="0 0 24 24"><polygon points="6 4 19 12 6 20 6 4"/></svg><span class="lbl-t">Resume</span></button>
+        <button class="bg" data-bulk="pause" disabled><svg class="icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg><span class="lbl-t">Pause</span></button>
+        <button class="bg" data-bulk="delete" disabled><svg class="icon" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6M10 11v6M14 11v6"/></svg><span class="lbl-t">Delete</span></button>
+      </div>
+      <div class="tspc"></div>
+      <label class="sbx"><svg class="icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg><input id="search" type="search" placeholder="Search" autocomplete="off" spellcheck="false"></label>
+      <button class="icon-btn lg" data-bulk="stopall" title="Pause everything" aria-label="Pause everything"><svg class="icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg></button>
+      <button class="icon-btn lg" id="openSettings" title="Settings" aria-label="Settings"><svg class="icon" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.730l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg></button>
+    </div>
+    <div class="offline" id="offline">Can't reach Peak's downloader. It restarts on its own — if this stays, quit and reopen Peak.</div>
+    <div class="fl" id="list"></div>
+    <div class="stbar">
+      <div class="st"><svg class="icon" viewBox="0 0 24 24"><path d="M12 4v13M6 12l6 7 6-7"/></svg><span class="stv num" id="sSpeed">0 MB/s</span></div>
+      <div class="stsep"></div>
+      <div class="st"><span class="stk num" id="sCounts"></span></div>
+      <div class="tspc"></div>
+      <div class="st"><span class="stk">This session</span><span class="stv num" id="sSession">0 MB</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════ NEW DOWNLOAD ══════ -->
+<div class="scrim" id="addModal" role="dialog" aria-modal="true" aria-label="New download">
+  <div class="modal">
+    <div class="modal-hd">New download<button class="modal-x" data-close aria-label="Close"><svg class="icon" viewBox="0 0 24 24" style="stroke-width:2.4"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="modal-tabs" role="tablist">
+      <button class="mtab" data-atab="url" aria-selected="true">URL</button>
+      <button class="mtab" data-atab="batch">Batch</button>
+      <button class="mtab" data-atab="torrent">Torrent</button>
+    </div>
+    <form class="modal-body" id="addForm">
+      <input class="m-url" id="aUrl" placeholder="Paste URL here" autocomplete="off" spellcheck="false">
+      <div id="aTorrent" hidden style="display:flex;gap:8px;align-items:center;margin-top:8px"><button type="button" class="btn-ghost" id="aTorrentBtn">Open .torrent…</button><span id="aTorrentName" style="color:var(--t2);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Choose a .torrent file</span><input type="file" id="aTorrentFile" accept=".torrent,application/x-bittorrent" hidden></div>
+      <textarea class="m-url" id="aBatch" placeholder="One link per line — they'll all be queued" spellcheck="false" hidden></textarea>
+      <div class="m-probe" id="aProbe"></div>
+      <div class="m-size" id="aSize"></div>
+      <div id="aFiles"></div>
+      <div class="m-grid2">
+        <div><div class="m-lbl">Save to</div><button type="button" class="m-val" id="aFolder"><span></span><svg class="icon" viewBox="0 0 24 24" style="color:var(--t2)"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></div>
+        <div><div class="m-lbl">Rename (optional)</div><input class="m-val" id="aName" placeholder="filename" autocomplete="off" spellcheck="false"></div>
+      </div>
+      <div class="m-grid3">
+        <div><div class="m-lbl">Type</div><select class="m-val" id="aType"><option value="video">Video</option><option value="mp3">MP3 audio</option></select></div>
+        <div><div class="m-lbl">Quality</div><select class="m-val" id="aQuality"></select></div>
+        <div><div class="m-lbl">Connections</div><select class="m-val" id="aConn"><option value="">Default</option><option>4</option><option>8</option><option>16</option></select></div>
+      </div>
+      <div class="modal-foot">
+        <button type="button" class="m-adv" id="aAdv">Advanced options →</button>
+        <div class="modal-btns"><button type="button" class="btn-ghost" data-close>Cancel</button><button class="btn-grad" type="submit" id="aStart">Start download</button></div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ══════ FILE DETAIL ══════ -->
+<div class="scrim" id="detail" role="dialog" aria-modal="true" aria-label="Download details"><div class="modal det" id="detBody"></div></div>
+
+<div class="scrim" id="settings" role="dialog" aria-modal="true" aria-label="Settings">
+  <div class="modal">
+    <div class="modal-head">Settings
+      <button class="icon-btn" id="closeSettings" aria-label="Close"><svg width="11" height="11" viewBox="0 0 24 24" stroke="#cec4bf" stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button data-tab="save">Save to</button><button data-tab="quality">Quality</button><button data-tab="conn">Connection</button><button data-tab="done">When done</button><button data-tab="general">General</button>
+    </div>
+    <div class="modal-body">
+      <section data-pane="save">
+        <div class="set-block"><div class="lbl">Main download folder</div><div class="path"><div class="num" data-folder-path="download_dir"></div><button class="chip" data-folder="download_dir">Change</button></div><div class="hint">Everything goes here unless a type has its own folder.</div></div>
+        <div class="set-block"><div class="lbl">Video folder</div><div class="path"><div class="num" data-folder-path="video_dir"></div><button class="chip ghost" data-folder-clear="video_dir">Same as main</button><button class="chip" data-folder="video_dir">Change</button></div><div class="hint"></div></div>
+        <div class="set-block"><div class="lbl">Music (MP3) folder</div><div class="path"><div class="num" data-folder-path="audio_dir"></div><button class="chip ghost" data-folder-clear="audio_dir">Same as main</button><button class="chip" data-folder="audio_dir">Change</button></div><div class="hint"></div></div>
+        <div class="set-block"><div class="lbl">Images folder</div><div class="path"><div class="num" data-folder-path="image_dir"></div><button class="chip ghost" data-folder-clear="image_dir">Same as main</button><button class="chip" data-folder="image_dir">Change</button></div><div class="hint">Used for Pinterest image pins.</div></div>
+        <div class="set-row"><div><div>Subfolder per site</div><div class="hint">e.g. …/Youtube, …/Pinterest</div></div><button class="switch" data-toggle="subfolder_by_site" role="switch" aria-label="Subfolder per site"><span></span></button></div>
+        <div class="set-block"><div class="lbl">File name</div><div class="seg num" data-setting="filename"><button data-v="title">Title</button><button data-v="title_id">Title [ID]</button><button data-v="site_title">Site – Title</button><button data-v="date_title">Date Title</button></div></div>
+        <div class="set-block"><div class="lbl">If the file already exists</div><div class="seg num" data-setting="if_exists"><button data-v="rename">Rename</button><button data-v="overwrite">Overwrite</button><button data-v="skip">Skip</button></div><div class="hint">Rename saves as “name (2)”.</div></div>
+      </section>
+      <section data-pane="quality">
+        <div class="set-block"><div class="lbl">Default video quality</div><div class="seg num" data-setting="video_quality"><button data-v="best">Best</button><button data-v="2160">4K</button><button data-v="1440">1440</button><button data-v="1080">1080</button><button data-v="720">720</button><button data-v="480">480</button></div><div class="hint">Falls back to the closest lower quality if a video doesn't have it.</div></div>
+        <div class="set-block"><div class="lbl">Default MP3 bitrate</div><div class="seg num" data-setting="audio_quality"><button data-v="128">128</button><button data-v="192">192</button><button data-v="256">256</button><button data-v="320">320</button></div></div>
+        <div class="set-block"><div class="lbl">Video format</div><div class="seg num" data-setting="container"><button data-v="mp4">MP4</button><button data-v="mkv">MKV</button></div></div>
+        <div class="set-row"><div><div>QuickTime-compatible video</div><div class="hint">H.264 only. Plays on every Mac and phone, but caps at 1080p.</div></div><button class="switch" data-toggle="compatible" role="switch" aria-label="QuickTime-compatible video"><span></span></button></div>
+        <div class="set-row"><div><div>Embed cover art</div><div class="hint">Thumbnail inside MP3s and MP4s.</div></div><button class="switch" data-toggle="embed_thumbnail" role="switch" aria-label="Embed cover art"><span></span></button></div>
+        <div class="set-row"><div><div>Download subtitles</div><div class="hint">English subtitles embedded in the video when available.</div></div><button class="switch" data-toggle="subtitles" role="switch" aria-label="Download subtitles"><span></span></button></div>
+      </section>
+      <section data-pane="conn">
+        <div class="set-row"><div><div>Simultaneous downloads</div><div class="hint">Others wait in the queue.</div></div><div class="num-in"><input type="number" data-num="max_downloads" inputmode="numeric"><span></span></div></div>
+        <div class="set-row"><div><div>Connections per download</div><div class="hint">More parts at once = faster. 8 is a good default.</div></div><div class="num-in"><input type="number" data-num="connections" inputmode="numeric"><span></span></div></div>
+        <div class="set-row"><div><div>Speed limit</div><div class="hint">0 = unlimited.</div></div><div class="num-in"><input type="number" data-num="speed_limit" inputmode="numeric"><span>MB/s</span></div></div>
+        <div class="set-row"><div><div>Retries on error</div></div><div class="num-in"><input type="number" data-num="retries" inputmode="numeric"><span></span></div></div>
+        <div class="set-block"><div class="lbl">Proxy</div><input class="text-in" type="text" data-text="proxy" placeholder="e.g. socks5://127.0.0.1:1080 — blank for none" spellcheck="false"></div>
+        <div class="set-block"><div class="lbl">Use my browser login</div><div class="seg num" data-setting="cookies_browser"><button data-v="">Off</button><button data-v="chrome">Chrome</button><button data-v="safari">Safari</button><button data-v="brave">Brave</button><button data-v="firefox">Firefox</button></div><div class="hint">For private, age-restricted or members-only videos, and if YouTube asks to confirm you're not a bot.</div></div>
+      </section>
+      <section data-pane="done">
+        <div class="set-row"><div><div>Show a notification</div></div><button class="switch" data-toggle="notify" role="switch" aria-label="Show a notification"><span></span></button></div>
+        <div class="set-row"><div><div>Play a sound</div><div class="hint">Glass when done, Basso on failure.</div></div><button class="switch" data-toggle="sound" role="switch" aria-label="Play a sound"><span></span></button></div>
+        <div class="set-row"><div><div>Show the file in Finder</div></div><button class="switch" data-toggle="reveal_when_done" role="switch" aria-label="Show the file in Finder"><span></span></button></div>
+      </section>
+      <section data-pane="general">
+        <div class="set-row"><div><div>Start Peak at login</div><div class="hint">Runs quietly in the background.</div></div><button class="switch" id="loginSwitch" role="switch" aria-label="Start Peak at login"><span></span></button></div>
+        <div class="set-row"><div><div>Open Peak window when a download starts</div></div><button class="switch" data-toggle="open_app_on_start" role="switch" aria-label="Open Peak window when a download starts"><span></span></button></div>
+        <div class="hint" style="padding-top:6px">The download button on videos is turned on or off from the Chrome extension popup.</div>
+      </section>
+    </div>
+  </div>
+</div>
+
+
+<div class="toast" id="toast" role="status"></div>
+<script src="/app.js"></script>
+</body>
+</html>

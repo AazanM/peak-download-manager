@@ -1,0 +1,6 @@
+pywebview>=5.0
+pystray>=0.19
+pillow>=10.0
+yt-dlp[default]
+pyinstaller>=6.0
+libtorrent>=2.0
