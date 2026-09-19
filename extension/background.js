@@ -10,7 +10,7 @@ chrome.runtime.onInstalled.addListener(() => {
 
 async function send(url, mode, quality) {
   if (!(await isRunning())) {
-    notify("Peak isn't running", "It restarts automatically. If this keeps happening, run scripts/install.sh again.");
+    notify("Peak isn't running", "Open the Peak app, then try again.");
     return { ok: false, error: "Peak isn't running" };
   }
   try {

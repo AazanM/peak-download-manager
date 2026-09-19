@@ -72,7 +72,7 @@ if (!supported) {
   setStatus("idle");
 } else if (!(await isRunning())) {
   $("pageTitle").textContent = "Peak isn't running";
-  note("It starts at login and restarts itself. If this keeps showing, run scripts/install.sh again.");
+  note("Open the Peak app, then try again.");
   $("mp3").disabled = $("video").disabled = true;
   $("videoSub").textContent = "—";
   setStatus("offline", true);
